@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auction Leaderboard Live</title>
+<style>
+  body { font-family: Arial, sans-serif; background: transparent; color: #fff; }
+  #auction { background: rgba(30,30,30,0.8); padding: 30px; border-radius: 25px; width: 400px; text-align: center; box-shadow: 0 0 25px rgba(255,215,0,0.9); }
+  #auction h1 { color: #ffd700; margin-bottom: 20px; font-size: 30px; text-shadow: 1px 1px 5px #000; }
+  .bidder { font-size: 20px; margin: 5px 0; }
+  #timer { font-size: 24px; margin-top: 15px; font-weight: bold; color: #00ffcc; transition: color 0.3s; }
+  .delay { color: #ff4444 !important; }
+</style>
+</head>
+<body>
+
+<div id="auction">
+  <h1>Live Auction Leaderboard</h1>
+  <div id="leaderboard">
+    <p class="bidder">1. --- : 0 Coins</p>
+    <p class="bidder">2. --- : 0 Coins</p>
+    <p class="bidder">3. --- : 0 Coins</p>
+  </div>
+  <p id="timer">03:00</p>
+</div>
+
+<script>
+const ROOM_ID = "7575188463411022603"; // Room ID اللايف
+let leaderboard = [];
+let totalTime = 180; // 3 دقائق
+let delayTime = 30; // 30 ثانية بعد انتهاء الوقت
+let currentTimer = totalTime;
+let timerElement = document.getElementById('timer');
+let auctionEnded = false;
+
+// تحديث العداد كل ثانية مع Delay ظاهر باللون الأحمر
+let timerInterval = setInterval(()=>{
+    if(currentTimer > 0){
+        currentTimer--;
+        let minutes = String(Math.floor(currentTimer/60)).padStart(2,'0');
+        let seconds = String(currentTimer%60).padStart(2,'0');
+        timerElement.innerText = `${minutes}:${seconds}`;
+    } else if(currentTimer === 0 && !auctionEnded){
+        // بدء Delay
+        currentTimer = delayTime;
+        auctionEnded = true;
+        timerElement.classList.add('delay'); // اللون الأحمر
+        timerElement.style.color = '#ff4444'; // ضمان اللون الأحمر
+        timerElement.innerText = `00:${String(currentTimer).padStart(2,'0')}`;
+    } else if(currentTimer > -1 && auctionEnded){
+        currentTimer--;
+        timerElement.innerText = `00:${String(currentTimer).padStart(2,'0')}`;
+        if(currentTimer < 0){
+            clearInterval(timerInterval);
+            timerElement.innerText = 'Auction Ended';
+        }
+    }
+}, 1000);
+
+// دالة تحديث الـ leaderboard
+function updateLeaderboard(username, giftValue){
+    let user = leaderboard.find(u => u.name === username);
+    if(user){
+        user.value += giftValue;
+    } else {
+        leaderboard.push({name: username, value: giftValue});
+    }
+
+    leaderboard.sort((a,b) => b.value - a.value);
+    const display = leaderboard.slice(0,3).map((u,i)=>`${i+1}. ${u.name} : ${u.value} Coins`).join('<br>');
+    document.getElementById('leaderboard').innerHTML = display;
+}
+
+// اتصال مباشر باللايف عن طريق TikTok Chat Reader (WebSocket داخل الصفحة)
+let socket = new WebSocket(`wss://tiktok-chat-reader.zerody.one/live/${ROOM_ID}`);
+
+socket.onmessage = function(event){
+    let data = JSON.parse(event.data);
+    if(data.event === "gift"){
+        let username = data.uniqueId;
+        let giftValue = data.diamondCount;
+        updateLeaderboard(username, giftValue);
+    }
+};
+
+socket.onopen = function(){
+    console.log("Connected to TikTok Live Room: " + ROOM_ID);
+};
+
+socket.onerror = function(err){
+    console.error("WebSocket error:", err);
+};
+
+</script>
+
+</body>
+</html>
